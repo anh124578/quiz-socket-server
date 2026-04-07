@@ -183,22 +183,26 @@ function chooseNextHostUid(room: Room): string {
 
 function ensureValidHost(room: Room) {
   const hostStillExists = room.players.some((p) => p.uid === room.hostUid);
-  const hostIsPresent = room.presentUids.includes(room.hostUid);
 
   if (room.status === "waiting" || room.status === "countdown") {
+    // Nếu host hiện tại vẫn còn trong room thì giữ nguyên host,
+    // dù người đó chưa quay lại màn phòng.
+    if (hostStillExists) {
+      return;
+    }
+
+    // Nếu host cũ đã rời hẳn khỏi room thì ưu tiên reservedHostUid
+    // nếu người này vẫn còn trong room.
     if (
       room.reservedHostUid &&
-      room.hostUid === room.reservedHostUid &&
-      room.players.some((p) => p.uid === room.reservedHostUid) &&
-      room.presentUids.includes(room.reservedHostUid)
+      room.players.some((p) => p.uid === room.reservedHostUid)
     ) {
+      room.hostUid = room.reservedHostUid;
       return;
     }
 
-    if (hostStillExists && hostIsPresent) {
-      return;
-    }
-
+    // Nếu không còn host cũ / reserved host thì mới chuyển cho
+    // người đang có mặt trong phòng, rồi mới fallback sang player đầu tiên.
     const nextPresentHost = room.players.find((p) =>
       room.presentUids.includes(p.uid)
     );
