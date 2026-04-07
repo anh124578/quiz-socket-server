@@ -185,14 +185,10 @@ function ensureValidHost(room: Room) {
   const hostStillExists = room.players.some((p) => p.uid === room.hostUid);
 
   if (room.status === "waiting" || room.status === "countdown") {
-    // Nếu host hiện tại vẫn còn trong room thì giữ nguyên host,
-    // dù người đó chưa quay lại màn phòng.
     if (hostStillExists) {
       return;
     }
 
-    // Nếu host cũ đã rời hẳn khỏi room thì ưu tiên reservedHostUid
-    // nếu người này vẫn còn trong room.
     if (
       room.reservedHostUid &&
       room.players.some((p) => p.uid === room.reservedHostUid)
@@ -201,8 +197,6 @@ function ensureValidHost(room: Room) {
       return;
     }
 
-    // Nếu không còn host cũ / reserved host thì mới chuyển cho
-    // người đang có mặt trong phòng, rồi mới fallback sang player đầu tiên.
     const nextPresentHost = room.players.find((p) =>
       room.presentUids.includes(p.uid)
     );
@@ -994,10 +988,30 @@ io.on("connection", (socket: Socket) => {
       return ack?.({ ok: false, error: "Bạn không ở trong phòng" });
     }
 
+    const wasHost = room.hostUid === uid;
+
     removePresentUid(room, uid);
 
     if (room.reservedHostUid === uid) {
       room.reservedHostUid = undefined;
+    }
+
+    if (
+      wasHost &&
+      (room.status === "waiting" ||
+        room.status === "countdown" ||
+        room.status === "postgame")
+    ) {
+      const nextPresentHost = room.players.find(
+        (p) => p.uid !== uid && room.presentUids.includes(p.uid)
+      );
+
+      if (nextPresentHost) {
+        room.hostUid = nextPresentHost.uid;
+      } else {
+        const nextHost = room.players.find((p) => p.uid !== uid);
+        room.hostUid = nextHost?.uid ?? room.hostUid;
+      }
     }
 
     ensureValidHost(room);
